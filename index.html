@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dice Balance Tester</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.25rem;
+      color: #fff;
+    }
+
+    .subtitle {
+      color: #888;
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    .setup {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .setup label {
+      font-size: 1rem;
+      color: #ccc;
+    }
+
+    .setup input {
+      width: 80px;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #1a1d27;
+      color: #fff;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .setup input:focus { outline: none; border-color: #5b7fff; }
+
+    .btn {
+      padding: 0.5rem 1.25rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      font-weight: 600;
+    }
+
+    .btn:active { transform: scale(0.96); }
+
+    .btn-primary {
+      background: #5b7fff;
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: #4a6be0; }
+
+    .btn-danger {
+      background: #ff4d4d;
+      color: #fff;
+    }
+
+    .btn-danger:hover { background: #e03c3c; }
+
+    .btn-pdf {
+      background: #22c55e;
+      color: #fff;
+    }
+
+    .btn-pdf:hover { background: #1aab50; }
+
+    .btn-undo {
+      background: #f59e0b;
+      color: #fff;
+    }
+
+    .btn-undo:hover { background: #d97706; }
+
+    #app { width: 100%; max-width: 800px; }
+
+    .face-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .face-btn {
+      padding: 0.75rem 0;
+      border: 2px solid #2a2d3a;
+      border-radius: 10px;
+      background: #1a1d27;
+      color: #fff;
+      font-size: 1.25rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, transform 0.1s;
+      position: relative;
+    }
+
+    .face-btn:hover {
+      background: #252836;
+      border-color: #5b7fff;
+    }
+
+    .face-btn:active { transform: scale(0.93); }
+
+    .face-btn .count {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 400;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .stats-panel {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stats-panel h2 {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      color: #aaa;
+      font-weight: 600;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid #222;
+      font-size: 0.9rem;
+    }
+
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: #999; }
+    .stat-value { color: #fff; font-weight: 600; }
+
+    .bar-chart {
+      margin-top: 1rem;
+    }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+      font-size: 0.85rem;
+    }
+
+    .bar-label {
+      width: 32px;
+      text-align: right;
+      color: #aaa;
+      flex-shrink: 0;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 22px;
+      background: #111;
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.25s ease;
+      min-width: 0;
+    }
+
+    .bar-expected {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(255,255,255,0.35);
+      z-index: 2;
+    }
+
+    .bar-pct {
+      width: 50px;
+      text-align: right;
+      color: #aaa;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .verdict {
+      text-align: center;
+      padding: 1rem;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+    }
+
+    .verdict-fair { background: #14532d; color: #4ade80; }
+    .verdict-slight { background: #422006; color: #fbbf24; }
+    .verdict-biased { background: #450a0a; color: #f87171; }
+    .verdict-none { background: #1a1d27; color: #666; border: 1px solid #2a2d3a; }
+
+    .hidden { display: none; }
+
+    .total-rolls {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 800;
+      color: #5b7fff;
+      margin-bottom: 0.25rem;
+    }
+
+    .total-label {
+      text-align: center;
+      color: #666;
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dice Balance Tester</h1>
+  <p class="subtitle">Roll your die, tap the face that lands, and track the stats.</p>
+
+  <div id="app">
+    <div class="setup">
+      <label for="numFaces">Number of faces:</label>
+      <input type="number" id="numFaces" min="2" max="120" value="6">
+      <button class="btn btn-primary" onclick="initDice()">Start</button>
+    </div>
+
+    <div id="testArea" class="hidden">
+      <div class="total-rolls" id="totalRolls">0</div>
+      <div class="total-label">total rolls</div>
+
+      <div class="face-grid" id="faceGrid"></div>
+
+      <div class="actions">
+        <button class="btn btn-undo" onclick="undoLast()">Undo Last</button>
+        <button class="btn btn-danger" onclick="resetRolls()">Reset Rolls</button>
+        <button class="btn btn-pdf" onclick="exportPDF()">Export Stats PDF</button>
+      </div>
+
+      <div id="verdict" class="verdict verdict-none">Roll the die to begin analysis</div>
+
+      <div class="stats-panel">
+        <h2>Distribution</h2>
+        <div class="bar-chart" id="barChart"></div>
+      </div>
+
+      <div class="stats-panel" id="statsPanel">
+        <h2>Statistics</h2>
+        <div id="statsBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let faces = 0;
+    let rolls = [];
+    let counts = {};
+
+    function initDice() {
+      faces = parseInt(document.getElementById('numFaces').value, 10);
+      if (isNaN(faces) || faces < 2) { alert('Enter at least 2 faces.'); return; }
+      if (faces > 120) { alert('Maximum 120 faces.'); return; }
+
+      rolls = [];
+      counts = {};
+      for (let i = 1; i <= faces; i++) counts[i] = 0;
+
+      const grid = document.getElementById('faceGrid');
+      grid.innerHTML = '';
+      for (let i = 1; i <= faces; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'face-btn';
+        btn.innerHTML = `${i}<span class="count" id="cnt-${i}">0</span>`;
+        btn.onclick = () => recordRoll(i);
+        grid.appendChild(btn);
+      }
+
+      document.getElementById('testArea').classList.remove('hidden');
+      updateUI();
+    }
+
+    function recordRoll(face) {
+      rolls.push(face);
+      counts[face]++;
+      updateUI();
+    }
+
+    function undoLast() {
+      if (rolls.length === 0) return;
+      const last = rolls.pop();
+      counts[last]--;
+      updateUI();
+    }
+
+    function resetRolls() {
+      if (rolls.length === 0) return;
+      if (!confirm('Clear all roll data?')) return;
+      rolls = [];
+      for (let i = 1; i <= faces; i++) counts[i] = 0;
+      updateUI();
+    }
+
+    function updateUI() {
+      const total = rolls.length;
+      document.getElementById('totalRolls').textContent = total;
+
+      for (let i = 1; i <= faces; i++) {
+        document.getElementById(`cnt-${i}`).textContent = counts[i];
+      }
+
+      renderBars(total);
+      renderStats(total);
+      renderVerdict(total);
+    }
+
+    function renderBars(total) {
+      const chart = document.getElementById('barChart');
+      const maxCount = Math.max(1, ...Object.values(counts));
+
+      let html = '';
+      for (let i = 1; i <= faces; i++) {
+        const pct = total > 0 ? (counts[i] / total * 100) : 0;
+        const width = total > 0 ? (counts[i] / maxCount * 100) : 0;
+        const expected = 100 / faces;
+        const expectedPos = (1 / faces) / (maxCount / total || 1) * 100;
+        const hue = getHue(pct, expected);
+        html += `
+          <div class="bar-row">
+            <span class="bar-label">${i}</span>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${width}%;background:hsl(${hue},70%,50%)"></div>
+              ${total > 0 ? `<div class="bar-expected" style="left:${Math.min(expectedPos, 100)}%"></div>` : ''}
+            </div>
+            <span class="bar-pct">${pct.toFixed(1)}%</span>
+          </div>`;
+      }
+      chart.innerHTML = html;
+    }
+
+    function getHue(actual, expected) {
+      const deviation = Math.abs(actual - expected) / expected;
+      if (deviation < 0.1) return 140;
+      if (deviation < 0.25) return 50;
+      return 0;
+    }
+
+    function chiSquared(total) {
+      if (total === 0) return { chi2: 0, pValue: 1 };
+      const expected = total / faces;
+      let chi2 = 0;
+      for (let i = 1; i <= faces; i++) {
+        chi2 += Math.pow(counts[i] - expected, 2) / expected;
+      }
+      const df = faces - 1;
+      const pValue = 1 - chi2CDF(chi2, df);
+      return { chi2, pValue, df };
+    }
+
+    // Approximate chi-squared CDF using regularized incomplete gamma
+    function chi2CDF(x, k) {
+      return lowerGammaReg(k / 2, x / 2);
+    }
+
+    function lowerGammaReg(a, x) {
+      if (x <= 0) return 0;
+      if (x < a + 1) {
+        // Series expansion
+        let sum = 1 / a, term = 1 / a;
+        for (let n = 1; n < 200; n++) {
+          term *= x / (a + n);
+          sum += term;
+          if (Math.abs(term) < 1e-12 * Math.abs(sum)) break;
+        }
+        return sum * Math.exp(-x + a * Math.log(x) - lgamma(a));
+      } else {
+        // Continued fraction (upper)
+        return 1 - upperGammaCF(a, x);
+      }
+    }
+
+    function upperGammaCF(a, x) {
+      let f = x + 1 - a, c = 1e30, d = 1 / f, h = d;
+      for (let i = 1; i < 200; i++) {
+        const an = -i * (i - a);
+        const bn = x + 2 * i + 1 - a;
+        d = bn + an * d; if (Math.abs(d) < 1e-30) d = 1e-30;
+        c = bn + an / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+        d = 1 / d;
+        const delta = c * d;
+        h *= delta;
+        if (Math.abs(delta - 1) < 1e-12) break;
+      }
+      return Math.exp(-x + a * Math.log(x) - lgamma(a)) * h;
+    }
+
+    function lgamma(x) {
+      // Lanczos approximation
+      const g = 7;
+      const coef = [
+        0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+        771.32342877765313, -176.61502916214059, 12.507343278686905,
+        -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7
+      ];
+      if (x < 0.5) {
+        return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+      }
+      x -= 1;
+      let a = coef[0];
+      const t = x + g + 0.5;
+      for (let i = 1; i < g + 2; i++) a += coef[i] / (x + i);
+      return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+    }
+
+    function renderStats(total) {
+      const body = document.getElementById('statsBody');
+      if (total === 0) {
+        body.innerHTML = '<div class="stat-row"><span class="stat-label">No data yet</span></div>';
+        return;
+      }
+
+      const expected = (total / faces).toFixed(2);
+      const { chi2, pValue, df } = chiSquared(total);
+
+      const vals = Object.values(counts);
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      const minFaces = [], maxFaces = [];
+      for (let i = 1; i <= faces; i++) {
+        if (counts[i] === min) minFaces.push(i);
+        if (counts[i] === max) maxFaces.push(i);
+      }
+
+      body.innerHTML = `
+        <div class="stat-row"><span class="stat-label">Faces</span><span class="stat-value">${faces}</span></div>
+        <div class="stat-row"><span class="stat-label">Total rolls</span><span class="stat-value">${total}</span></div>
+        <div class="stat-row"><span class="stat-label">Expected per face</span><span class="stat-value">${expected}</span></div>
+        <div class="stat-row"><span class="stat-label">Most rolled</span><span class="stat-value">${maxFaces.join(', ')} (${max})</span></div>
+        <div class="stat-row"><span class="stat-label">Least rolled</span><span class="stat-value">${minFaces.join(', ')} (${min})</span></div>
+        <div class="stat-row"><span class="stat-label">Chi-squared (χ²)</span><span class="stat-value">${chi2.toFixed(3)}</span></div>
+        <div class="stat-row"><span class="stat-label">Degrees of freedom</span><span class="stat-value">${df}</span></div>
+        <div class="stat-row"><span class="stat-label">p-value</span><span class="stat-value">${pValue.toFixed(4)}</span></div>
+      `;
+    }
+
+    function renderVerdict(total) {
+      const el = document.getElementById('verdict');
+      if (total < 5) {
+        el.className = 'verdict verdict-none';
+        el.textContent = total === 0 ? 'Roll the die to begin analysis' : `Keep rolling — need more data (${total} rolls)`;
+        return;
+      }
+
+      const { pValue } = chiSquared(total);
+      if (pValue > 0.05) {
+        el.className = 'verdict verdict-fair';
+        el.textContent = `Fair — no significant bias detected (p = ${pValue.toFixed(4)})`;
+      } else if (pValue > 0.01) {
+        el.className = 'verdict verdict-slight';
+        el.textContent = `Possible bias detected (p = ${pValue.toFixed(4)})`;
+      } else {
+        el.className = 'verdict verdict-biased';
+        el.textContent = `Likely biased (p = ${pValue.toFixed(4)})`;
+      }
+    }
+
+    function exportPDF() {
+      const total = rolls.length;
+      if (total === 0) { alert('No rolls to export.'); return; }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const pw = doc.internal.pageSize.getWidth();
+      let y = 20;
+
+      doc.setFontSize(20);
+      doc.text('Dice Balance Test Report', pw / 2, y, { align: 'center' });
+      y += 8;
+      doc.setFontSize(10);
+      doc.setTextColor(120);
+      doc.text(`Generated ${new Date().toLocaleString()}`, pw / 2, y, { align: 'center' });
+      doc.setTextColor(0);
+      y += 12;
+
+      // Summary
+      const expected = (total / faces).toFixed(2);
+      const { chi2, pValue, df } = chiSquared(total);
+      const { verdict, color } = getPDFVerdict(pValue, total);
+
+      doc.setFontSize(14);
+      doc.text('Summary', 14, y); y += 8;
+      doc.setFontSize(10);
+
+      const summaryLines = [
+        ['Dice type', `d${faces}`],
+        ['Total rolls', `${total}`],
+        ['Expected per face', expected],
+        ['Chi-squared (χ²)', chi2.toFixed(3)],
+        ['Degrees of freedom', `${df}`],
+        ['p-value', pValue.toFixed(4)],
+        ['Verdict', verdict],
+      ];
+
+      summaryLines.forEach(([label, val]) => {
+        doc.setFont(undefined, 'bold');
+        doc.text(`${label}:`, 18, y);
+        doc.setFont(undefined, 'normal');
+        doc.text(val, 65, y);
+        y += 6;
+      });
+
+      y += 6;
+
+      // Distribution table
+      doc.setFontSize(14);
+      doc.text('Distribution', 14, y); y += 8;
+      doc.setFontSize(9);
+
+      // Table header
+      doc.setFont(undefined, 'bold');
+      doc.text('Face', 18, y);
+      doc.text('Count', 50, y);
+      doc.text('Percentage', 80, y);
+      doc.text('Expected', 115, y);
+      doc.text('Deviation', 145, y);
+      doc.setFont(undefined, 'normal');
+      y += 2;
+      doc.setDrawColor(200);
+      doc.line(18, y, 180, y);
+      y += 5;
+
+      for (let i = 1; i <= faces; i++) {
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+        const pct = (counts[i] / total * 100).toFixed(1);
+        const dev = (counts[i] - total / faces).toFixed(1);
+        const devSign = parseFloat(dev) >= 0 ? '+' : '';
+        doc.text(`${i}`, 18, y);
+        doc.text(`${counts[i]}`, 50, y);
+        doc.text(`${pct}%`, 80, y);
+        doc.text(expected, 115, y);
+        doc.text(`${devSign}${dev}`, 145, y);
+        y += 5.5;
+      }
+
+      y += 8;
+      if (y > 250) { doc.addPage(); y = 20; }
+
+      // Bar chart
+      doc.setFontSize(14);
+      doc.text('Visual Distribution', 14, y); y += 8;
+
+      const maxCount = Math.max(1, ...Object.values(counts));
+      const barMaxW = 110;
+      for (let i = 1; i <= faces; i++) {
+        if (y > 280) { doc.addPage(); y = 20; }
+        const w = (counts[i] / maxCount) * barMaxW;
+        const pct = (counts[i] / total * 100);
+        const hue = getHue(pct, 100 / faces);
+        const rgb = hslToRgb(hue / 360, 0.6, 0.5);
+
+        doc.setFontSize(8);
+        doc.text(`${i}`, 18, y + 3);
+        doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+        doc.rect(30, y - 1, Math.max(w, 0.5), 5, 'F');
+        doc.setFontSize(7);
+        doc.text(`${counts[i]} (${pct.toFixed(1)}%)`, 30 + w + 2, y + 3);
+        y += 7;
+      }
+
+      doc.save(`dice-balance-d${faces}-${total}rolls.pdf`);
+    }
+
+    function getPDFVerdict(pValue, total) {
+      if (total < 5) return { verdict: 'Insufficient data', color: [150, 150, 150] };
+      if (pValue > 0.05) return { verdict: 'Fair — no significant bias', color: [34, 197, 94] };
+      if (pValue > 0.01) return { verdict: 'Possible bias detected', color: [245, 158, 11] };
+      return { verdict: 'Likely biased', color: [239, 68, 68] };
+    }
+
+    function hslToRgb(h, s, l) {
+      let r, g, b;
+      if (s === 0) { r = g = b = l; }
+      else {
+        const hue2rgb = (p, q, t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+      }
+      return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+    }
+  </script>
+</body>
+</html>
